@@ -1,9 +1,6 @@
-  /*
-	Author	jinzhouyun
-	mail	2435575291@qq.com
-	Date	2017.06
+/*
+	Date	2018.04
 */
-
 
 #include "GroveStream.h"
 #include "Constants.h"
@@ -12,9 +9,16 @@
 #include <Bridge.h>
 #include <Process.h>
 #include "FBD.h"
-#include <FiniteStateMachine.h>
+#include "FiniteStateMachine.h"
 
 #include "SIM5216.h"
+
+//
+State nightStandby(NULL);
+State nightAction(NULL);
+FiniteStateMachine nightController(nightStandby);
+TON nightTON;
+
 /* Time Count Variables */
 static uint32_t nDisplayRTCTime = millis();
 static uint32_t nRefreshTime = millis();
@@ -24,7 +28,6 @@ static uint32_t nStreamCheckTime = millis();
 
 /* 
 	FBD Blocks variables for critical contrl logic 
-
 	Time settings are defined in constant.h, so we don't need to change this.
 */
 static TON fanOn, fanOff; // FAN control
@@ -35,9 +38,7 @@ static Rtrg fenceVoltRise[8];
 static Rtrg fenceAlarmTrg[4]; // Checking fence alarm conditions
 static Ftrg fenceAlarmDis[4]; // Checking fence alarm conditions
 
-
 /* FSM Machine Routins for solenoid valve controls */
-
 // Standby Status
 void standbyEnter();
 void standbyUpdate();
@@ -78,8 +79,23 @@ void temp4thUpdate();
 void delaySoleEnter();
 void delaySoleUpdate();
 
+void nightAction1stEnter();
+void nightAction1stUpdate();
+void nightAction2ndEnter();
+void nightAction2ndUpdate();
+void nightAction3rdEnter();
+void nightAction3rdUpdate();
+void nightAction4thEnter();
+void nightAction4thUpdate();
+
 /* State list */
 State Standby = State(standbyEnter, standbyUpdate, NULL);
+
+State nightAction1st = State(nightAction1stEnter, nightAction1stUpdate, NULL);
+State nightAction2nd = State(nightAction2ndEnter, nightAction2ndUpdate, NULL);
+State nightAction3rd = State(nightAction3rdEnter, nightAction3rdUpdate, NULL);
+State nightAction4th = State(nightAction4thEnter, nightAction4thUpdate, NULL);
+
 State Humi1st = State(humi1stEnter, humi1stUpdate, NULL);
 State Humi2nd = State(humi2ndEnter, humi2ndUpdate, NULL);
 State Humi3rd = State(humi3rdEnter, humi3rdUpdate, NULL);
@@ -108,6 +124,11 @@ void InitVar()
 
 	for (uint8_t idx = 0; idx < 8; idx++)
 		currStatus.diffPress[idx] = 0;
+
+	nightTON.IN = false;
+	nightTON.ET = 0;
+	nightTON.PT = PHOTOCELLTIME;
+	nightTON.Q = false;
 
 	fanOn.IN = 0;
 	fanOn.ET = 0;
@@ -162,34 +183,34 @@ void InitVar()
 /* Hardware init routine */
 void InitPorts()
 {
-  // Working Led
-  pinMode(WORKLED, OUTPUT);
+	// Working Led
+	pinMode(WORKLED, OUTPUT);
 
-  // Filter Warning Leds
-  pinMode(ZONE1FILTCHECK, OUTPUT);
-  pinMode(ZONE2FILTCHECK, OUTPUT);
-  pinMode(ZONE3FILTCHECK, OUTPUT);
-  pinMode(ZONE4FILTCHECK, OUTPUT);
+	// Filter Warning Leds
+	pinMode(ZONE1FILTCHECK, OUTPUT);
+	pinMode(ZONE2FILTCHECK, OUTPUT);
+	pinMode(ZONE3FILTCHECK, OUTPUT);
+	pinMode(ZONE4FILTCHECK, OUTPUT);
 
-  // Fence Fail Leds
-  pinMode(ZONE1FENCEFAIL, OUTPUT);
-  pinMode(ZONE2FENCEFAIL, OUTPUT);
-  pinMode(ZONE3FENCEFAIL, OUTPUT);
-  pinMode(ZONE4FENCEFAIL, OUTPUT);
+	// Fence Fail Leds
+	pinMode(ZONE1FENCEFAIL, OUTPUT);
+	pinMode(ZONE2FENCEFAIL, OUTPUT);
+	pinMode(ZONE3FENCEFAIL, OUTPUT);
+	pinMode(ZONE4FENCEFAIL, OUTPUT);
 
-  // Solenoid Relay outputs 
-  pinMode(SOLENOID1, OUTPUT);
-  digitalWrite(SOLENOID1, HIGH);
-  pinMode(SOLENOID2, OUTPUT);
-  digitalWrite(SOLENOID2, HIGH);
-  pinMode(SOLENOID3, OUTPUT);
-  digitalWrite(SOLENOID3, HIGH);
-  pinMode(SOLENOID4, OUTPUT);
-  digitalWrite(SOLENOID4, HIGH);
+	// Solenoid Relay outputs 
+	pinMode(SOLENOID1, OUTPUT);
+	digitalWrite(SOLENOID1, HIGH);
+	pinMode(SOLENOID2, OUTPUT);
+	digitalWrite(SOLENOID2, HIGH);
+	pinMode(SOLENOID3, OUTPUT);
+	digitalWrite(SOLENOID3, HIGH);
+	pinMode(SOLENOID4, OUTPUT);
+	digitalWrite(SOLENOID4, HIGH);
 
-  // FAN Relays
-  pinMode(FAN1, OUTPUT);
-  pinMode(FAN2, OUTPUT);
+	// FAN Relays
+	pinMode(FAN1, OUTPUT);
+	pinMode(FAN2, OUTPUT);
 }
 
 /* Setup */
@@ -247,11 +268,34 @@ void setup()
 	nMeasureTasktime = millis();
 }  // end of setup
 
-
 /* */
 void loop()
 {
-	// Read Fileter Pressure
+	// check brightness condition
+	nightController.update();
+	nightTON.IN = checkSunDown();
+	TONFunc(&nightTON);
+	
+	// 
+	if (nightController.isInState(nightStandby))
+	{
+		if (nightTON.Q && solenoidFSM.isInState(Standby))
+		{
+			Serial.println(F("sun down and condition for solenoid is actiavted"));
+			nightController.transitionTo(nightAction);
+			solenoidFSM.transitionTo(nightAction1st);
+		}
+	}
+
+	if (nightController.isInState(nightAction))
+	{
+		if (nightController.timeInCurrentState() > NIGHTACTIONINTERVAL)
+		{
+			nightController.transitionTo(nightStandby);
+		}
+	}
+
+	// Read Filter Pressure
 	readDiffPressure();
 
 	// Read Fence Voltages
@@ -299,11 +343,11 @@ void loop()
 		// Check pressure differnces between in and out sensors.
 		filterCheck[idx].IN = abs(currStatus.diffPress[idx * 2] - currStatus.diffPress[idx * 2 + 1]) > ERRDIFFPRESS;
 		TONFunc(&filterCheck[idx]);
+		
 		// Error present
 		currStatus.diffLeds[idx] = filterCheck[idx].Q;
 	}
   
-
 	// Fence Voltage Check
 	bool bModified = false;
 	for (uint8_t idx = 0; idx < 8; idx++)
@@ -420,7 +464,7 @@ void loop()
 	// UpdateStream Temperature and humidity and differnece voltages
 	if (nStreamUpdateTime + STREAMUPDATECYCLE < millis())
 	{
-		Serial.println("I will update roveStream data!");
+		Serial.println("I will update GroveStream data!");
 		temperStream();
 		nStreamUpdateTime = millis();
 	}
@@ -444,7 +488,6 @@ void standbyEnter()
 
 void standbyUpdate()
 {
-
 	if (currStatus.humidity < HUMISOLSETP)
 	{
 		Serial.println("HUMI SETP Condition Issued!");
@@ -489,8 +532,8 @@ void standbyUpdate()
 		{
 			Serial.println("Standby Timing!");
 			currStatus.lastActiveSole = 4;
-
 		}
+
 		// Solenoid Turn off all
 		for (uint8_t idx = 0; idx < 4; idx++)
 			currStatus.bSol[idx] = 0;
@@ -747,5 +790,82 @@ void delaySoleUpdate()
 			solenoidFSM.transitionTo(Temp1st);
 		else
 			solenoidFSM.transitionTo(Standby);
+	}
+}
+
+
+void nightAction1stEnter()
+{
+	Serial.println(F("night action first step"));
+	currStatus.bSol[0] = 1;
+	currStatus.bSol[1] = 0;
+	currStatus.bSol[2] = 0;
+	currStatus.bSol[3] = 0;
+	solenoidStream();
+}
+
+void nightAction1stUpdate()
+{
+	currStatus.lastActiveSole = 1;
+	if (solenoidFSM.timeInCurrentState() > SOLENOIDNIGHTINTERVAL)
+	{
+		solenoidFSM.transitionTo(nightAction2nd);
+	}
+}
+
+void nightAction2ndEnter()
+{
+	Serial.println(F("night action second step"));
+	currStatus.bSol[0] = 0;
+	currStatus.bSol[1] = 1;
+	currStatus.bSol[2] = 0;
+	currStatus.bSol[3] = 0;
+	solenoidStream();
+}
+
+void nightAction2ndUpdate()
+{
+	currStatus.lastActiveSole = 2;
+	if (solenoidFSM.timeInCurrentState() > SOLENOIDNIGHTINTERVAL)
+	{
+		solenoidFSM.transitionTo(nightAction3rd);
+	}
+}
+
+void nightAction3rdEnter()
+{
+	Serial.println(F("night action third step"));
+	currStatus.bSol[0] = 0;
+	currStatus.bSol[1] = 0;
+	currStatus.bSol[2] = 1;
+	currStatus.bSol[3] = 0;
+	solenoidStream();
+}
+
+void nightAction3rdUpdate()
+{
+	currStatus.lastActiveSole = 3;
+	if (solenoidFSM.timeInCurrentState() > SOLENOIDNIGHTINTERVAL)
+	{
+		solenoidFSM.transitionTo(nightAction4th);
+	}
+}
+
+void nightAction4thEnter()
+{
+	Serial.println(F("night action forth step"));
+	currStatus.bSol[0] = 0;
+	currStatus.bSol[1] = 0;
+	currStatus.bSol[2] = 0;
+	currStatus.bSol[3] = 1;
+	solenoidStream();
+}
+
+void nightAction4thUpdate()
+{
+	currStatus.lastActiveSole = 4;
+	if (solenoidFSM.timeInCurrentState() > SOLENOIDNIGHTINTERVAL)
+	{
+		solenoidFSM.transitionTo(Delay10Min);
 	}
 }

@@ -95,4 +95,12 @@ const uint8_t ERRORVOLT = 7;
 // Fence voltagge error holding time
 const uint8_t HOLDINGTIME = 200;
 
+// photocell sensor 
+const uint8_t PHOTOCELL = A8;
+const uint8_t BRIGHTTHRESHOLD = 100;
+const uint16_t PHOTOCELLTIME = 200;
+
+// const uint32_t NIGHTACTIONINTERVAL = 7200 * 1000;
+const uint32_t NIGHTACTIONINTERVAL = 300 * 1000;
+const uint32_t SOLENOIDNIGHTINTERVAL = 5000;
 #endif

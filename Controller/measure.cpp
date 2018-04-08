@@ -1,7 +1,7 @@
 #include "Constants.h"
 #include <Wire.h>
-#include <Adafruit_ADS1015.h>
-#include <LiquidCrystal_I2C.h>
+#include "Adafruit_ADS1015.h"
+#include "LiquidCrystal_I2C.h"
 
 #include "measure.h"
 #include "RTClib.h"
@@ -375,4 +375,23 @@ double mapdouble(double x, double in_min, double in_max, double out_min, double 
 
 
 	return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
+}
+
+
+bool checkSunDown()
+{
+	uint16_t photocellReading = analogRead(PHOTOCELL);
+
+	Serial.print("Analog reading = ");
+	Serial.println(photocellReading);     // the raw analog reading
+
+	// LED gets brighter the darker it is at the sensor
+	// that means we have to -invert- the reading from 0-1023 back to 1023-0
+	photocellReading = 1023 - photocellReading;
+	//now we have to map 0-1023 to 0-255 since thats the range analogWrite uses
+	uint8_t brightness = map(photocellReading, 0, 1023, 0, 255);
+	if (brightness < BRIGHTTHRESHOLD)
+		return true;
+	else
+		return false;
 }
