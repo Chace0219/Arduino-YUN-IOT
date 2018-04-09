@@ -42,7 +42,7 @@ const uint8_t DIFFCHN4IN = A6;
 const uint8_t DIFFCHN4OUT = A7;
 
 // Humidity setpoint 70%
-const uint8_t HUMISOLSETP = 70;
+const uint8_t HUMISOLSETP = 20;
 
 // Temperature setpoint, 26 degree
 const uint8_t TEMPSOLSETP = 26;
@@ -77,7 +77,7 @@ const uint8_t LOWTEMP = 26;
 const uint16_t CHECKHOLD = 1000;
 
 // Differnce pressure between in and out pressure sensor
-const uint8_t ERRDIFFPRESS = 20; // Unit PSI
+const uint8_t ERRDIFFPRESS = 50; // Unit PSI
 
 // Humi, Temp, Filter voltage stream update interval, 120 sec
 const uint32_t STREAMUPDATECYCLE = 120000;
@@ -97,10 +97,10 @@ const uint8_t HOLDINGTIME = 200;
 
 // photocell sensor 
 const uint8_t PHOTOCELL = A8;
-const uint8_t BRIGHTTHRESHOLD = 100;
+const uint8_t BRIGHTTHRESHOLD = 50;
 const uint16_t PHOTOCELLTIME = 200;
 
 // const uint32_t NIGHTACTIONINTERVAL = 7200 * 1000;
-const uint32_t NIGHTACTIONINTERVAL = 300 * 1000;
+const uint32_t NIGHTACTIONINTERVAL = 60000;
 const uint32_t SOLENOIDNIGHTINTERVAL = 5000;
 #endif

@@ -34,13 +34,14 @@ bool getAverageHumiAndTemp()
 	Serial.print(F("1st temp is "));
 	Serial.print(dht1.readTemperature(), 1);
 	Serial.println(F("C."));
-	temp += dht2.readTemperature();
+	temp += dht1.readTemperature();
 
 	Serial.print(F("1st humi is "));
 	Serial.print(dht1.readHumidity(), 1);
 	Serial.println(F("%."));
 	humi += dht1.readHumidity();
 
+	/*
 	Serial.print(F("2nd temp is "));
 	Serial.print(dht2.readTemperature(), 1);
 	Serial.println(F("C."));
@@ -72,9 +73,10 @@ bool getAverageHumiAndTemp()
 	Serial.print(dht4.readHumidity(), 1);
 	Serial.println(F("%."));
 	humi += dht4.readHumidity();
+	*/
 
-	currStatus.temperature = temp / 4;
-	currStatus.humidity = humi / 4;
+	currStatus.temperature = temp;
+	currStatus.humidity = humi;
 
 	Serial.print(F("Average temperature is "));
 	Serial.println(currStatus.temperature, 1);
@@ -208,7 +210,7 @@ void displayTime()
 	lcd01.setCursor(0, 0);
 	lcd01.print(F("GREENHOUSE1 "));
 	lcd01.print(timeString);
-	Serial.println(timeString);
+	// Serial.println(timeString);
 }
 
 
@@ -381,16 +383,14 @@ double mapdouble(double x, double in_min, double in_max, double out_min, double 
 bool checkSunDown()
 {
 	uint16_t photocellReading = analogRead(PHOTOCELL);
-
-	Serial.print("Analog reading = ");
-	Serial.println(photocellReading);     // the raw analog reading
-
 	// LED gets brighter the darker it is at the sensor
 	// that means we have to -invert- the reading from 0-1023 back to 1023-0
 	photocellReading = 1023 - photocellReading;
 	//now we have to map 0-1023 to 0-255 since thats the range analogWrite uses
 	uint8_t brightness = map(photocellReading, 0, 1023, 0, 255);
-	if (brightness < BRIGHTTHRESHOLD)
+	// Serial.print("brightness = ");
+	// Serial.println(brightness);     // the raw analog reading
+	if (brightness > BRIGHTTHRESHOLD)
 		return true;
 	else
 		return false;

@@ -257,11 +257,12 @@ void setup()
 	displayTime();
 	RefreshScreen();
 
-	/* Upload all current data into stream server */
+	/* Upload all current data into stream server
 	temperStream();
 	fanStream();
 	solenoidStream();
 	zoneVoltageStream();
+	*/
 
 	// Time varaibles proecss for multi process
 	nDisplayRTCTime = millis();
@@ -291,6 +292,7 @@ void loop()
 	{
 		if (nightController.timeInCurrentState() > NIGHTACTIONINTERVAL)
 		{
+			Serial.println(F("night idle status finished"));
 			nightController.transitionTo(nightStandby);
 		}
 	}
@@ -479,6 +481,7 @@ void loop()
 /* FSM Procs */
 void standbyEnter()
 {
+	Serial.println("entered solenoid standby step");
 	currStatus.bSol[0] = 0;
 	currStatus.bSol[1] = 0;
 	currStatus.bSol[2] = 0;
@@ -530,7 +533,7 @@ void standbyUpdate()
 	{
 		if (solenoidFSM.timeInCurrentState() > SOLENOIDCYCLEDELAY)
 		{
-			Serial.println("Standby Timing!");
+			// Serial.println("Standby Timing!");
 			currStatus.lastActiveSole = 4;
 		}
 
@@ -771,6 +774,7 @@ void delaySoleEnter()
 	currStatus.bSol[2] = 0;
 	currStatus.bSol[3] = 0;
 	solenoidStream();
+	Serial.println("entered solenoid delay step");
 }
 
 void delaySoleUpdate()
